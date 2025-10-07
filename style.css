@@ -80,6 +80,22 @@ button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
+#color-red {
+    background-color: #e53935;
+    color: white;
+}
+#color-blue {
+    background-color: #1e88e5;
+    color: white;
+}
+#color-green {
+    background-color: #43a047;
+    color: white;
+}
+#color-orange {
+    background-color: #fb8c00;
+    color: white;
+}
 
 @media (prefers-color-scheme: light) {
   :root {

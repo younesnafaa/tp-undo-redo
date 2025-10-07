@@ -118,8 +118,9 @@ const polylineMachine = createMachine(
                 const newPoints = currentPoints.slice(0, size - 2);
                 polyline.points(newPoints);
                 polyline.stroke("black"); // On change la couleur
-                // On sauvegarde la polyline dans la couche de dessin
-                dessin.add(polyline); // On l'ajoute à la couche de dessin
+                // On sauvegarde la polyline dans la couche de dessin via Command et UndoManager
+                const cmd = new AddPolylineCommand(polyline, dessin);
+                undoManager.executeCommand(cmd);
             },
             addPoint: (context, event) => {
                 const pos = stage.getPointerPosition();
@@ -153,6 +154,89 @@ const polylineMachine = createMachine(
     }
 );
 
+// Command Pattern Implementation
+class Command {
+    execute() {
+        throw new Error("execute() must be implemented");
+    }
+    undo() {
+        throw new Error("undo() must be implemented");
+    }
+}
+
+class AddPolylineCommand extends Command {
+    constructor(line, layer) {
+        super();
+        this.line = line;
+        this.layer = layer;
+    }
+    execute() {
+        this.layer.add(this.line);
+    }
+    undo() {
+        this.line.remove();
+    }
+}
+
+class ChangeColorCommand extends Command {
+    constructor(line, newColor) {
+        super();
+        this.line = line;
+        this.newColor = newColor;
+        this.oldColor = line.stroke();
+    }
+    execute() {
+        this.line.stroke(this.newColor);
+    }
+    undo() {
+        this.line.stroke(this.oldColor);
+    }
+}
+
+// UndoManager using Stack
+class UndoManager {
+    constructor() {
+        this.undoStack = new Stack();
+        this.redoStack = new Stack();
+    }
+    executeCommand(cmd) {
+        cmd.execute();
+        this.undoStack.push(cmd);
+        this.redoStack.clear();
+        this.updateButtons();
+    }
+    undo() {
+        if (!this.undoStack.isEmpty()) {
+            const cmd = this.undoStack.pop();
+            cmd.undo();
+            this.redoStack.push(cmd);
+            this.updateButtons();
+        }
+    }
+    redo() {
+        if (!this.redoStack.isEmpty()) {
+            const cmd = this.redoStack.pop();
+            cmd.execute();
+            this.undoStack.push(cmd);
+            this.updateButtons();
+        }
+    }
+    canUndo() {
+        return !this.undoStack.isEmpty();
+    }
+    canRedo() {
+        return !this.redoStack.isEmpty();
+    }
+    updateButtons() {
+        const undoButton = document.getElementById("undo");
+        const redoButton = document.getElementById("redo");
+        if (undoButton) undoButton.disabled = !this.canUndo();
+        if (redoButton) redoButton.disabled = !this.canRedo();
+    }
+}
+
+const undoManager = new UndoManager();
+
 const polylineService = interpret(polylineMachine)
     .onTransition((state) => {
         console.log("Current state:", state.value);
@@ -175,5 +259,29 @@ window.addEventListener("keydown", (event) => {
 // bouton Undo
 const undoButton = document.getElementById("undo");
 undoButton.addEventListener("click", () => {
-    
+    undoManager.undo();
 });
+
+// bouton Redo
+const redoButton = document.getElementById("redo");
+if (redoButton) {
+    redoButton.addEventListener("click", () => {
+        undoManager.redo();
+    });
+}
+
+// Ajout des boutons de couleur
+const colors = ["red", "blue", "green", "orange"];
+colors.forEach(color => {
+    const btn = document.getElementById(`color-${color}`);
+    if (btn) {
+        btn.addEventListener("click", () => {
+            if (polyline) {
+                const cmd = new ChangeColorCommand(polyline, color);
+                undoManager.executeCommand(cmd);
+            }
+        });
+    }
+});
+
+undoManager.updateButtons();
